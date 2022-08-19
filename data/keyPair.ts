@@ -1,5 +1,5 @@
 export const ethPrivKey =
-  "0xb2d77280e67adc18d04e054daa677095e17c021632e1298cf5a5c6295a21fd11";
+  "b2d77280e67adc18d04e054daa677095e17c021632e1298cf5a5c6295a21fd11";
 
 export const keyPairOptions = {
   id: "did:example:489398593#test",

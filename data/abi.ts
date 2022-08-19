@@ -22,8 +22,20 @@ export const ContractABI = [
       {
         indexed: false,
         internalType: "string",
-        name: "credential",
+        name: "encryptedCredential",
         type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "string",
+        name: "ownerPublicKey",
+        type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "issuedTimestamp",
+        type: "uint256",
       },
     ],
     name: "MintCredential",
@@ -73,8 +85,18 @@ export const ContractABI = [
     outputs: [
       {
         internalType: "string",
-        name: "credential",
+        name: "encryptedCredential",
         type: "string",
+      },
+      {
+        internalType: "string",
+        name: "ownerPublicKey",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "issuedTimestamp",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
@@ -89,8 +111,18 @@ export const ContractABI = [
       },
       {
         internalType: "string",
-        name: "credential",
+        name: "encryptedCredential",
         type: "string",
+      },
+      {
+        internalType: "string",
+        name: "ownerPublicKey",
+        type: "string",
+      },
+      {
+        internalType: "uint256",
+        name: "issuedTimestamp",
+        type: "uint256",
       },
     ],
     name: "mintCredential",

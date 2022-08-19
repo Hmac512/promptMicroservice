@@ -46,3 +46,10 @@ export const hashToBigNumber = (data: string) => {
   const hash = ethers.utils.keccak256(Buffer.from(data));
   return ethers.BigNumber.from(hash);
 };
+
+export const generateUniqSerial = (): string => {
+  return "xxxx-xxxx-xxx-xxxx".replace(/[x]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    return r.toString(16);
+  });
+};

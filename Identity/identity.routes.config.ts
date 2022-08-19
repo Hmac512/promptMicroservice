@@ -7,14 +7,29 @@ import {
   deriveProof,
 } from "@mattrglobal/jsonld-signatures-bbs";
 import { extendContextLoader, sign, verify, purposes } from "jsonld-signatures";
-import { getInputDocument, hashToBigNumber, makeErrorResp } from "./utils";
+import {
+  generateUniqSerial,
+  getInputDocument,
+  hashToBigNumber,
+  makeErrorResp,
+} from "./utils";
 import { exampleControllerDoc } from "../data/controllerDocument";
 import { bbsContext } from "../data/bbs";
 import { citizenVocab } from "../data/citizenVocab";
 import { suiteContext } from "../data/suiteContext";
 import { credentialContext } from "../data/credentialsContext";
 import { keyPairOptions } from "../data/keyPair";
-
+import {
+  util as pgpUtils,
+  generateKey as pgpGenerateKey,
+  key as pgpKey_,
+  sign as pgpSign,
+  cleartext,
+  verify as pgpVerify,
+  message as pgpMessage,
+  encrypt as pgpEncrypt,
+} from "openpgp";
+import dayjs from "dayjs";
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const documents: any = {
   "did:example:489398593#test": keyPairOptions,
@@ -53,12 +68,28 @@ export class UsersRoutes extends CommonRoutesConfig {
 
   configureRoutes() {
     const keyPair = CommonRoutesConfig.keyPair;
+    const issuerPgpPublicKey = CommonRoutesConfig.pgpPublicKey;
     this.app
       .route(`/mint`)
       .post(async (req: express.Request, res: express.Response) => {
-        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
         // TODO: Prevent minting duplicate credentials. Hashing is an option, but doing it at the KYC level is better.
-        const { firstName, lastName, id } = req.body;
+
+        const { signedPayload } = req.body;
+        const clearText = await cleartext.readArmored(signedPayload);
+        const payload = JSON.parse(clearText.getText());
+        const { firstName, lastName, pgpPublicKeyArmored } = payload;
+        const id = generateUniqSerial();
+        const pgpPublicKey = (await pgpKey_.readArmored(pgpPublicKeyArmored))
+          .keys[0];
+        const verifyOptions = {
+          message: clearText,
+          publicKeys: [pgpPublicKey],
+        };
+        const verification = await pgpVerify(verifyOptions);
+        if (!verification.signatures[0].valid) {
+          return res.status(401).send(makeErrorResp("Bad PGP Signature"));
+        }
+
         const inputDocument = getInputDocument(firstName, lastName, id);
 
         const signedDocument = await sign(inputDocument, {
@@ -67,11 +98,27 @@ export class UsersRoutes extends CommonRoutesConfig {
           documentLoader,
         });
         const docString = JSON.stringify(signedDocument, null);
+        const credentialId = hashToBigNumber(docString);
+        const options = {
+          message: pgpMessage.fromText(docString),
+          publicKeys: [pgpPublicKey, issuerPgpPublicKey],
+        };
+        const encryptedDocstring = (await pgpEncrypt(options)).data;
+
+        const timestamp = dayjs().unix();
         await this.identityContract.mintCredential(
-          hashToBigNumber(docString),
-          Buffer.from(docString).toString("base64")
+          credentialId._hex,
+          encryptedDocstring,
+          pgpPublicKeyArmored,
+          timestamp
         );
-        res.status(200).send(JSON.stringify(signedDocument));
+        res.status(200).send(
+          JSON.stringify({
+            credentialId: credentialId._hex,
+            encryptedDocstring,
+            timestamp,
+          })
+        );
       });
 
     this.app
