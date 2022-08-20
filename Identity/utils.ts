@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { ethers } from "ethers";
-
+import { key as pgpKey, message as pgpMessage } from "openpgp";
 export const makeErrorResp = (msg: string) => ({ error: true, msg });
 
 export const getInputDocument = (
@@ -52,4 +52,18 @@ export const generateUniqSerial = (): string => {
     const r = Math.floor(Math.random() * 16);
     return r.toString(16);
   });
+};
+
+export const getDecryptOptions = async (
+  privateKey: pgpKey.Key,
+  // publicKey: pgpKey.Key,
+  encryptedMsg: string
+) => ({
+  message: await pgpMessage.readArmored(encryptedMsg),
+  // publicKeys: [publicKey],
+  privateKeys: [privateKey],
+});
+
+export const getPGPKey = async (keyString: string) => {
+  return (await pgpKey.readArmored(keyString)).keys[0];
 };

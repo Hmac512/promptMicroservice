@@ -9,7 +9,9 @@ import {
 import { extendContextLoader, sign, verify, purposes } from "jsonld-signatures";
 import {
   generateUniqSerial,
+  getDecryptOptions,
   getInputDocument,
+  getPGPKey,
   hashToBigNumber,
   makeErrorResp,
 } from "./utils";
@@ -28,6 +30,7 @@ import {
   verify as pgpVerify,
   message as pgpMessage,
   encrypt as pgpEncrypt,
+  decrypt as pgpDecrypt,
 } from "openpgp";
 import dayjs from "dayjs";
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
@@ -61,14 +64,14 @@ const customDocLoader = (url: string): any => {
 const documentLoader: any = extendContextLoader(customDocLoader);
 
 export class UsersRoutes extends CommonRoutesConfig {
-  requiredAttributes = ["firstName", "lastName", "id"];
   constructor(app: express.Application) {
     super(app, "UsersRoutes");
   }
 
   configureRoutes() {
     const keyPair = CommonRoutesConfig.keyPair;
-    const issuerPgpPublicKey = CommonRoutesConfig.pgpPublicKey;
+    const pgpPublicKey = CommonRoutesConfig.pgpPublicKey;
+    const pgpPrivateKey = CommonRoutesConfig.pgpPrivateKey;
     this.app
       .route(`/mint`)
       .post(async (req: express.Request, res: express.Response) => {
@@ -79,8 +82,9 @@ export class UsersRoutes extends CommonRoutesConfig {
         const payload = JSON.parse(clearText.getText());
         const { firstName, lastName, pgpPublicKeyArmored } = payload;
         const id = generateUniqSerial();
-        const pgpPublicKey = (await pgpKey_.readArmored(pgpPublicKeyArmored))
-          .keys[0];
+        const ownerPgpPublicKey = (
+          await pgpKey_.readArmored(pgpPublicKeyArmored)
+        ).keys[0];
         const verifyOptions = {
           message: clearText,
           publicKeys: [pgpPublicKey],
@@ -101,7 +105,8 @@ export class UsersRoutes extends CommonRoutesConfig {
         const credentialId = hashToBigNumber(docString);
         const options = {
           message: pgpMessage.fromText(docString),
-          publicKeys: [pgpPublicKey, issuerPgpPublicKey],
+          publicKeys: [ownerPgpPublicKey, pgpPublicKey],
+          privateKeys: [pgpPrivateKey],
         };
         const encryptedDocstring = (await pgpEncrypt(options)).data;
 
@@ -123,19 +128,23 @@ export class UsersRoutes extends CommonRoutesConfig {
 
     this.app
       .route(`/verify`)
-      .all(
-        (
-          req: express.Request,
-          res: express.Response,
-          next: express.NextFunction
-        ) => {
-          // this middleware function runs before any request to /users/:userId
-          // but it doesn't accomplish anything just yet---
-          // it simply passes control to the next applicable function below using next()
-          next();
-        }
-      )
-      .get((req: express.Request, res: express.Response) => {
+      .post(async (req: express.Request, res: express.Response) => {
+        const { encryptedDocstring, credentialId, state, verificationId } =
+          req.body;
+        console.log(credentialId);
+        const latestVerification =
+          await this.identityContract.getLatestVerification(credentialId);
+        const ownerPublicKeyString =
+          await this.identityContract.getCredentialOwnerPublicKey(credentialId);
+        console.log(latestVerification, ownerPublicKeyString);
+        const ownerPublicKey = await getPGPKey(ownerPublicKeyString);
+        const decryptOptions = await getDecryptOptions(
+          pgpPrivateKey,
+          encryptedDocstring
+        );
+        const { data: decryptedText } = await pgpDecrypt(decryptOptions);
+        console.log(decryptedText);
+
         res.status(200).send(`GET requested for id ${req.params.userId}`);
       });
 

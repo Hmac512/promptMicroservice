@@ -1,13 +1,18 @@
 import express from "express";
 import { Bls12381G2KeyPair } from "@mattrglobal/jsonld-signatures-bbs";
 import { ethers } from "ethers";
-import { ethPrivKey } from "../data/keyPair";
+import {
+  ethPrivKey,
+  PGPPrivateKeyString,
+  PGPPublicKeyString,
+} from "../data/keyPair";
 import { ContractABI } from "../data/abi";
 import {
   util as pgpUtils,
   generateKey as pgpGenerateKey,
   key as pgpKey_,
 } from "openpgp";
+import { getPGPKey } from "../Identity/utils";
 
 const contractAddress = "0x4BD023b2E66d37958A3948A7130e2Ed55FDD7c5b";
 
@@ -16,8 +21,8 @@ export abstract class CommonRoutesConfig {
   name: string;
   ethProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
   ethSigner = new ethers.Wallet(`0x${ethPrivKey}`, this.ethProvider);
-  static pgpKey: any;
-  static pgpPublicKey: any;
+  static pgpPrivateKey: pgpKey_.Key;
+  static pgpPublicKey: pgpKey_.Key;
   identityContract = new ethers.Contract(
     contractAddress,
     ContractABI,
@@ -45,23 +50,11 @@ export abstract class CommonRoutesConfig {
     await this.loadPGPKey();
   };
   static loadPGPKey = async () => {
-    const privKeyBuff = Buffer.from(ethPrivKey);
-    const privateKey = pgpUtils.Uint8Array_to_str(privKeyBuff);
-    const options = {
-      curve: "secp256k1",
-      userIds: { name: "Identity", email: "identity@somedomain.com" },
-      numBits: 4096,
-      material: {
-        key: privateKey,
-      },
-    };
-    //@ts-ignore
-    const pgpKey = await pgpGenerateKey(options);
-    this.pgpKey = pgpKey;
-    const pgpPublicKey = (await pgpKey_.readArmored(pgpKey.publicKeyArmored))
-      .keys[0];
-    this.pgpPublicKey = pgpPublicKey;
-    console.log(pgpKey.publicKeyArmored);
+    const publicKey = await getPGPKey(PGPPublicKeyString);
+    this.pgpPublicKey = publicKey;
+
+    const privateKey = await getPGPKey(PGPPrivateKeyString);
+    this.pgpPrivateKey = privateKey;
   };
 
   getName = () => {
