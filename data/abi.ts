@@ -6,9 +6,40 @@ export const ContractABI = [
         name: "blsKey",
         type: "string",
       },
+      {
+        internalType: "string",
+        name: "publicKey_",
+        type: "string",
+      },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "string",
+        name: "blsPublicKey",
+        type: "string",
+      },
+    ],
+    name: "ChangedBLSPublicKey",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "string",
+        name: "publicKey",
+        type: "string",
+      },
+    ],
+    name: "ChangedPublicKey",
+    type: "event",
   },
   {
     anonymous: false,
@@ -427,13 +458,21 @@ export const ContractABI = [
         name: "blsPublicKey_",
         type: "string",
       },
+    ],
+    name: "setBLSPublicKey",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
       {
         internalType: "string",
         name: "publicKey_",
         type: "string",
       },
     ],
-    name: "setBLSPublicKey",
+    name: "setPublicKey",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
