@@ -16,6 +16,7 @@ import {
   getVerificationNonce,
   hashToBigNumber,
   makeErrorResp,
+  safeToJSONString,
   toBase64,
 } from "./utils";
 import { exampleControllerDoc } from "../data/controllerDocument";
@@ -83,16 +84,14 @@ export class UsersRoutes extends CommonRoutesConfig {
         const { signedPayload } = req.body;
         const clearText = await cleartext.readArmored(signedPayload);
         const payload = JSON.parse(clearText.getText());
-        const { firstName, lastName, pgpPublicKeyArmored } = payload;
-        console.log(pgpPublicKeyArmored);
+        const { firstName, lastName, holderPublicKeyArmored } = payload;
+        console.log(holderPublicKeyArmored);
         const id = generateUniqSerial();
         //await getPGPKey(PGPPublicKeyString);
-        const ownerPgpPublicKey = (
-          await pgpKey_.readArmored(pgpPublicKeyArmored)
-        ).keys[0];
+        const holderPublicKey = await getPGPKey(holderPublicKeyArmored);
         const verifyOptions = {
           message: clearText,
-          publicKeys: [ownerPgpPublicKey],
+          publicKeys: [holderPublicKey],
         };
         const verification = await pgpVerify(verifyOptions);
         if (!verification.signatures[0].valid) {
@@ -107,27 +106,36 @@ export class UsersRoutes extends CommonRoutesConfig {
           purpose: new purposes.AssertionProofPurpose(),
           documentLoader,
         });
-        const docString = JSON.stringify(signedDocument, null);
+        const docString = safeToJSONString(signedDocument);
         const credentialId = hashToBigNumber(docString);
         const options = {
           message: pgpMessage.fromText(docString),
-          publicKeys: [ownerPgpPublicKey, issuerPGPPublicKey],
+          publicKeys: [holderPublicKey, issuerPGPPublicKey],
           privateKeys: [issuerPGPPrivateKey],
         };
         const encryptedDocstring = (await pgpEncrypt(options)).data;
-
         const timestamp = dayjs().unix();
-        await this.identityContract.mintCredential(
-          credentialId._hex,
-          encryptedDocstring,
-          pgpPublicKeyArmored,
-          timestamp
-        );
+        let txResult: any = undefined;
+        try {
+          txResult = await this.identityContract.mintCredential(
+            credentialId._hex,
+            encryptedDocstring,
+            holderPublicKeyArmored,
+            timestamp
+          );
+        } catch (err) {
+          const errMsg = `Transaction failed - ${err}`;
+          console.error(errMsg);
+          return res.status(401).send(makeErrorResp(errMsg));
+        }
+        console.log(`Transaction succeeded ${txResult.hash}`);
+
         res.status(200).send(
           JSON.stringify({
             credentialId: credentialId._hex,
             encryptedDocstring,
             timestamp,
+            txHash: txResult.hash,
           })
         );
       });
@@ -224,7 +232,7 @@ export class UsersRoutes extends CommonRoutesConfig {
             .send(makeErrorResp("Verification ID mismatch"));
         }
 
-        const docString = JSON.stringify(proofDoc, null);
+        const docString = safeToJSONString(proofDoc);
         const options = {
           message: pgpMessage.fromText(docString),
           publicKeys: [
