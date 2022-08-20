@@ -9,6 +9,7 @@ import {
 import { extendContextLoader, sign, verify, purposes } from "jsonld-signatures";
 import {
   generateUniqSerial,
+  generateVerificationId,
   getDecryptOptions,
   getInputDocument,
   getPGPKey,
@@ -72,8 +73,8 @@ export class UsersRoutes extends CommonRoutesConfig {
 
   configureRoutes() {
     const keyPair = CommonRoutesConfig.keyPair;
-    const pgpPublicKey = CommonRoutesConfig.pgpPublicKey;
-    const pgpPrivateKey = CommonRoutesConfig.pgpPrivateKey;
+    const issuerPGPPublicKey = CommonRoutesConfig.pgpPublicKey;
+    const issuerPGPPrivateKey = CommonRoutesConfig.pgpPrivateKey;
     this.app
       .route(`/mint`)
       .post(async (req: express.Request, res: express.Response) => {
@@ -85,6 +86,7 @@ export class UsersRoutes extends CommonRoutesConfig {
         const { firstName, lastName, pgpPublicKeyArmored } = payload;
         console.log(pgpPublicKeyArmored);
         const id = generateUniqSerial();
+        //await getPGPKey(PGPPublicKeyString);
         const ownerPgpPublicKey = (
           await pgpKey_.readArmored(pgpPublicKeyArmored)
         ).keys[0];
@@ -94,6 +96,7 @@ export class UsersRoutes extends CommonRoutesConfig {
         };
         const verification = await pgpVerify(verifyOptions);
         if (!verification.signatures[0].valid) {
+          console.error("Bad PGP Signature");
           return res.status(401).send(makeErrorResp("Bad PGP Signature"));
         }
 
@@ -108,8 +111,8 @@ export class UsersRoutes extends CommonRoutesConfig {
         const credentialId = hashToBigNumber(docString);
         const options = {
           message: pgpMessage.fromText(docString),
-          publicKeys: [ownerPgpPublicKey, pgpPublicKey],
-          privateKeys: [pgpPrivateKey],
+          publicKeys: [ownerPgpPublicKey, issuerPGPPublicKey],
+          privateKeys: [issuerPGPPrivateKey],
         };
         const encryptedDocstring = (await pgpEncrypt(options)).data;
 
@@ -132,38 +135,121 @@ export class UsersRoutes extends CommonRoutesConfig {
     this.app
       .route(`/verify`)
       .post(async (req: express.Request, res: express.Response) => {
-        const { encryptedDocstring, credentialId, state, verificationId } =
-          req.body;
+        const { signedPayload } = req.body;
+        const clearText = await cleartext.readArmored(signedPayload);
+        const payload = JSON.parse(clearText.getText());
+        const {
+          encryptedDocstring,
+          credentialId,
+          state,
+          verifierPublicKeyArmored,
+          verificationId,
+        } = payload;
+
+        // Verify the payload is signed correctly by the verifier
+        const verifierPublicKey = await getPGPKey(verifierPublicKeyArmored);
+        const verifyOptions = {
+          message: clearText,
+          publicKeys: [verifierPublicKey],
+        };
+        const signatureVerification = await pgpVerify(verifyOptions);
+        if (!signatureVerification.signatures[0].valid) {
+          return res
+            .status(401)
+            .send(makeErrorResp("Bad Verifier PGP Signature"));
+        }
+
+        // Decrypt and verify the encrypted doc came from the credential holder
+
+        // Get data from EVM
         const latestVerification =
           await this.identityContract.getLatestVerification(credentialId);
-        const ownerPublicKeyString =
+        const credentialHolderPublicKeyArmored =
           await this.identityContract.getCredentialOwnerPublicKey(credentialId);
-        console.log(latestVerification, ownerPublicKeyString);
-        const ownerPublicKey = await getPGPKey(ownerPublicKeyString);
+
+        const credentialHolderPublicKey = await getPGPKey(
+          credentialHolderPublicKeyArmored
+        );
         const decryptOptions = await getDecryptOptions(
-          pgpPrivateKey,
-          ownerPublicKey,
+          issuerPGPPrivateKey,
+          credentialHolderPublicKey,
           encryptedDocstring
         );
-        const { data: decryptedText } = await pgpDecrypt(decryptOptions);
+        let decryptedText: string;
+        try {
+          const { data } = await pgpDecrypt(decryptOptions);
+          decryptedText = data;
+        } catch (err) {
+          console.error(
+            "Could not verify chain of custody of encrypted document"
+          );
+          return res
+            .status(401)
+            .send(makeErrorResp("Bad Credential Holder Signature"));
+        }
         const proofDoc = JSON.parse(decryptedText);
-        const verificationNonce = getVerificationNonce(
-          state,
-          latestVerification._hex,
-          credentialId
-        );
-        console.log("nonce", verificationNonce);
-        proofDoc.proof.nonce = toBase64(verificationNonce);
-        console.log(toBase64(verificationNonce));
 
+        // Set the nonce
+        const verificationNonce = toBase64(
+          getVerificationNonce(state, latestVerification._hex, credentialId)
+        );
+        proofDoc.proof.nonce = verificationNonce;
+
+        // Verify the provided nonce correctly validates the proof doc
         const verified = await verify(proofDoc, {
           suite: new BbsBlsSignatureProof2020(),
           purpose: new purposes.AssertionProofPurpose(),
           documentLoader,
         });
-        console.log("Verified", verified);
+        if (!verified.verified) {
+          console.error("Could not verify the provided state");
+          return res
+            .status(401)
+            .send(makeErrorResp("Unable to verify payload"));
+        }
 
-        res.status(200).send(`GET requested for id ${req.params.userId}`);
+        // At this point we know the verifier is eligible to view the secrets
+
+        const computedVerificationId = generateVerificationId(
+          proofDoc,
+          latestVerification._hex,
+          credentialId
+        );
+
+        // Final sanity check to make sure everyone agrees on what is to be put on chain
+        if (verificationId !== computedVerificationId) {
+          console.error("Verification ID mismatch");
+          return res
+            .status(401)
+            .send(makeErrorResp("Verification ID mismatch"));
+        }
+
+        const docString = JSON.stringify(proofDoc, null);
+        const options = {
+          message: pgpMessage.fromText(docString),
+          publicKeys: [
+            credentialHolderPublicKey,
+            verifierPublicKey,
+            issuerPGPPublicKey,
+          ],
+          privateKeys: [issuerPGPPrivateKey],
+        };
+        const encrypteDocstringWithSecrets = (await pgpEncrypt(options)).data;
+
+        const timestamp = dayjs().unix();
+        await this.identityContract.mintVerification(
+          credentialId,
+          computedVerificationId,
+          encrypteDocstringWithSecrets,
+          timestamp,
+          verifierPublicKeyArmored
+        );
+
+        res
+          .status(200)
+          .send(
+            JSON.stringify({ encrypteDocstring: encrypteDocstringWithSecrets })
+          );
       });
 
     return this.app;

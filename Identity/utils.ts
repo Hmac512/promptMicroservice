@@ -77,5 +77,17 @@ export const getVerificationNonce = (
     ethers.utils.toUtf8Bytes(`${credentialId}${previousVerification}${state}`)
   );
 };
+export const generateVerificationId = (
+  doc: any,
+  previousVerification: string,
+  credentialId: string
+) => {
+  const docHash = ethers.utils.keccak256(
+    Buffer.from(JSON.stringify(doc, null))
+  );
+  return ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes(`${credentialId}${previousVerification}${docHash}`)
+  );
+};
 
 export const toBase64 = (val: string) => Buffer.from(val).toString("base64");
