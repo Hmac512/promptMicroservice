@@ -129,7 +129,7 @@ export class UsersRoutes extends CommonRoutesConfig {
           console.error(errMsg);
           return res.status(401).send(makeErrorResp(errMsg));
         }
-        console.log(`Transaction succeeded ${txResult.hash}`);
+        console.log(`Mint transaction succeeded ${txResult.hash}`);
 
         res.status(200).send(
           JSON.stringify({
@@ -254,19 +254,29 @@ export class UsersRoutes extends CommonRoutesConfig {
         const encrypteDocstringWithSecrets = (await pgpEncrypt(options)).data;
 
         const timestamp = dayjs().unix();
-        // await this.identityContract.mintVerification(
-        //   credentialId,
-        //   computedVerificationId,
-        //   encrypteDocstringWithSecrets,
-        //   timestamp,
-        //   verifierPublicKeyArmored
-        // );
 
-        res
-          .status(200)
-          .send(
-            JSON.stringify({ encrypteDocstring: encrypteDocstringWithSecrets })
+        let txResult: any = undefined;
+        try {
+          txResult = await this.identityContract.mintVerification(
+            credentialId,
+            computedVerificationId,
+            encrypteDocstringWithSecrets,
+            timestamp,
+            verifierPublicKeyArmored
           );
+        } catch (err) {
+          const errMsg = `Transaction failed - ${err}`;
+          console.error(errMsg);
+          return res.status(401).send(makeErrorResp(errMsg));
+        }
+        console.log(`Verify transaction succeeded ${txResult.hash}`);
+
+        res.status(200).send(
+          JSON.stringify({
+            encrypteDocstring: encrypteDocstringWithSecrets,
+            txHash: txResult.hash,
+          })
+        );
       });
 
     return this.app;
