@@ -12,8 +12,10 @@ import {
   getDecryptOptions,
   getInputDocument,
   getPGPKey,
+  getVerificationNonce,
   hashToBigNumber,
   makeErrorResp,
+  toBase64,
 } from "./utils";
 import { exampleControllerDoc } from "../data/controllerDocument";
 import { bbsContext } from "../data/bbs";
@@ -81,13 +83,14 @@ export class UsersRoutes extends CommonRoutesConfig {
         const clearText = await cleartext.readArmored(signedPayload);
         const payload = JSON.parse(clearText.getText());
         const { firstName, lastName, pgpPublicKeyArmored } = payload;
+        console.log(pgpPublicKeyArmored);
         const id = generateUniqSerial();
         const ownerPgpPublicKey = (
           await pgpKey_.readArmored(pgpPublicKeyArmored)
         ).keys[0];
         const verifyOptions = {
           message: clearText,
-          publicKeys: [pgpPublicKey],
+          publicKeys: [ownerPgpPublicKey],
         };
         const verification = await pgpVerify(verifyOptions);
         if (!verification.signatures[0].valid) {
@@ -131,7 +134,6 @@ export class UsersRoutes extends CommonRoutesConfig {
       .post(async (req: express.Request, res: express.Response) => {
         const { encryptedDocstring, credentialId, state, verificationId } =
           req.body;
-        console.log(credentialId);
         const latestVerification =
           await this.identityContract.getLatestVerification(credentialId);
         const ownerPublicKeyString =
@@ -140,30 +142,28 @@ export class UsersRoutes extends CommonRoutesConfig {
         const ownerPublicKey = await getPGPKey(ownerPublicKeyString);
         const decryptOptions = await getDecryptOptions(
           pgpPrivateKey,
+          ownerPublicKey,
           encryptedDocstring
         );
         const { data: decryptedText } = await pgpDecrypt(decryptOptions);
-        console.log(decryptedText);
+        const proofDoc = JSON.parse(decryptedText);
+        const verificationNonce = getVerificationNonce(
+          state,
+          latestVerification._hex,
+          credentialId
+        );
+        console.log("nonce", verificationNonce);
+        proofDoc.proof.nonce = toBase64(verificationNonce);
+        console.log(toBase64(verificationNonce));
+
+        const verified = await verify(proofDoc, {
+          suite: new BbsBlsSignatureProof2020(),
+          purpose: new purposes.AssertionProofPurpose(),
+          documentLoader,
+        });
+        console.log("Verified", verified);
 
         res.status(200).send(`GET requested for id ${req.params.userId}`);
-      });
-
-    this.app
-      .route(`/publicKey`)
-      .all(
-        (
-          req: express.Request,
-          res: express.Response,
-          next: express.NextFunction
-        ) => {
-          // this middleware function runs before any request to /users/:userId
-          // but it doesn't accomplish anything just yet---
-          // it simply passes control to the next applicable function below using next()
-          next();
-        }
-      )
-      .get((req: express.Request, res: express.Response) => {
-        res.status(200).send(Buffer.from(keyPair.publicKey).toString("base64"));
       });
 
     return this.app;

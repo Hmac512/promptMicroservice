@@ -56,14 +56,26 @@ export const generateUniqSerial = (): string => {
 
 export const getDecryptOptions = async (
   privateKey: pgpKey.Key,
-  // publicKey: pgpKey.Key,
+  publicKey: pgpKey.Key,
   encryptedMsg: string
 ) => ({
   message: await pgpMessage.readArmored(encryptedMsg),
-  // publicKeys: [publicKey],
+  publicKeys: [publicKey],
   privateKeys: [privateKey],
 });
 
 export const getPGPKey = async (keyString: string) => {
   return (await pgpKey.readArmored(keyString)).keys[0];
 };
+
+export const getVerificationNonce = (
+  state: string,
+  previousVerification: string,
+  credentialId: string
+) => {
+  return ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes(`${credentialId}${previousVerification}${state}`)
+  );
+};
+
+export const toBase64 = (val: string) => Buffer.from(val).toString("base64");
