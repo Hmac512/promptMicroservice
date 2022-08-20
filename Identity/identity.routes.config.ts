@@ -174,9 +174,13 @@ export class UsersRoutes extends CommonRoutesConfig {
 
         // Get data from EVM
         const latestVerification =
-          await this.identityContract.getLatestVerification(credentialId);
+          await this.identityContract.getCredentialLatestVerification(
+            credentialId
+          );
         const credentialHolderPublicKeyArmored =
-          await this.identityContract.getCredentialOwnerPublicKey(credentialId);
+          await this.identityContract.getCredentialHolderPublicKey(
+            credentialId
+          );
 
         const credentialHolderPublicKey = await getPGPKey(
           credentialHolderPublicKeyArmored
@@ -260,9 +264,10 @@ export class UsersRoutes extends CommonRoutesConfig {
           txResult = await this.identityContract.mintVerification(
             credentialId,
             computedVerificationId,
+            latestVerification._hex,
             encrypteDocstringWithSecrets,
             timestamp,
-            verifierPublicKeyArmored
+            verifierPublicKeyHash
           );
         } catch (err) {
           const errMsg = `Transaction failed - ${err}`;

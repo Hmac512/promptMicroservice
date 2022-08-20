@@ -28,7 +28,7 @@ export const ContractABI = [
       {
         indexed: false,
         internalType: "string",
-        name: "ownerPublicKey",
+        name: "holderPublicKey",
         type: "string",
       },
       {
@@ -67,6 +67,12 @@ export const ContractABI = [
         internalType: "string",
         name: "encryptedDocument",
         type: "string",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "verifierPublicKeyHash",
+        type: "uint256",
       },
       {
         indexed: false,
@@ -127,7 +133,7 @@ export const ContractABI = [
       },
       {
         internalType: "string",
-        name: "ownerPublicKey",
+        name: "holderPublicKey",
         type: "string",
       },
       {
@@ -152,11 +158,11 @@ export const ContractABI = [
         type: "uint256",
       },
     ],
-    name: "getCredentialOwnerPublicKey",
+    name: "getCredentialEncryptedDocument",
     outputs: [
       {
         internalType: "string",
-        name: "publicKey",
+        name: "encryptedDocument",
         type: "string",
       },
     ],
@@ -171,11 +177,144 @@ export const ContractABI = [
         type: "uint256",
       },
     ],
-    name: "getLatestVerification",
+    name: "getCredentialHolderPublicKey",
+    outputs: [
+      {
+        internalType: "string",
+        name: "holderPublicKey",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "credentialId",
+        type: "uint256",
+      },
+    ],
+    name: "getCredentialLatestVerification",
     outputs: [
       {
         internalType: "uint256",
         name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "credentialId",
+        type: "uint256",
+      },
+    ],
+    name: "getCredentialTimestamp",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "timestamp",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    name: "getVerificationCredentialId",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "credentialId",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    name: "getVerificationEncryptedDocument",
+    outputs: [
+      {
+        internalType: "string",
+        name: "encryptedDocument",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    name: "getVerificationPreviousVerification",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "previousVerification",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    name: "getVerificationTimestamp",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "timestamp",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "verificationId",
+        type: "uint256",
+      },
+    ],
+    name: "getVerificationVerifierPublicKeyHash",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "verifierPublicKeyHash",
         type: "uint256",
       },
     ],
@@ -196,7 +335,7 @@ export const ContractABI = [
       },
       {
         internalType: "string",
-        name: "ownerPublicKey",
+        name: "holderPublicKey",
         type: "string",
       },
       {
@@ -223,6 +362,11 @@ export const ContractABI = [
         type: "uint256",
       },
       {
+        internalType: "uint256",
+        name: "previousVerificationId",
+        type: "uint256",
+      },
+      {
         internalType: "string",
         name: "encryptedDocument",
         type: "string",
@@ -233,9 +377,9 @@ export const ContractABI = [
         type: "uint256",
       },
       {
-        internalType: "string",
-        name: "verifierPublicKey",
-        type: "string",
+        internalType: "uint256",
+        name: "verifierPublicKeyHash",
+        type: "uint256",
       },
     ],
     name: "mintVerification",
@@ -258,6 +402,19 @@ export const ContractABI = [
   },
   {
     inputs: [],
+    name: "publicKey",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "renounceOwnership",
     outputs: [],
     stateMutability: "nonpayable",
@@ -267,7 +424,12 @@ export const ContractABI = [
     inputs: [
       {
         internalType: "string",
-        name: "publicKey",
+        name: "blsPublicKey_",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "publicKey_",
         type: "string",
       },
     ],
@@ -320,9 +482,9 @@ export const ContractABI = [
         type: "uint256",
       },
       {
-        internalType: "string",
-        name: "verifierPublicKey",
-        type: "string",
+        internalType: "uint256",
+        name: "verifierPublicKeyHash",
+        type: "uint256",
       },
     ],
     stateMutability: "view",
