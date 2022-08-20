@@ -68,26 +68,35 @@ export const getPGPKey = async (keyString: string) => {
   return (await pgpKey.readArmored(keyString)).keys[0];
 };
 
+export const safeToJSONString = (obj: any) => JSON.stringify(obj, null);
+
 export const getVerificationNonce = (
   state: string,
   previousVerification: string,
-  credentialId: string
-) => {
-  return ethers.utils.keccak256(
-    ethers.utils.toUtf8Bytes(`${credentialId}${previousVerification}${state}`)
+  credentialId: string,
+  verifierPublicKeyHash: string
+) =>
+  ethers.utils.toUtf8Bytes(
+    ethers.utils.keccak256(
+      ethers.utils.toUtf8Bytes(
+        `${credentialId}.${previousVerification}.${state}.${verifierPublicKeyHash}`
+      )
+    )
   );
-};
-
-export const safeToJSONString = (obj: any) => JSON.stringify(obj, null);
 
 export const generateVerificationId = (
   doc: any,
   previousVerification: string,
-  credentialId: string
+  credentialId: string,
+  verifierPublicKeyHash: string
 ) => {
-  const docHash = ethers.utils.keccak256(Buffer.from(safeToJSONString(doc)));
+  const docHash = ethers.utils.keccak256(
+    Buffer.from(JSON.stringify(doc, null))
+  );
   return ethers.utils.keccak256(
-    ethers.utils.toUtf8Bytes(`${credentialId}${previousVerification}${docHash}`)
+    ethers.utils.toUtf8Bytes(
+      `${credentialId}.${previousVerification}.${docHash}.${verifierPublicKeyHash}`
+    )
   );
 };
 

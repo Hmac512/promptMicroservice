@@ -37,6 +37,7 @@ import {
   decrypt as pgpDecrypt,
 } from "openpgp";
 import dayjs from "dayjs";
+import { ethers } from "ethers";
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
 const documents: any = {
   "did:example:489398593#test": keyPairOptions,
@@ -153,7 +154,9 @@ export class UsersRoutes extends CommonRoutesConfig {
           verifierPublicKeyArmored,
           verificationId,
         } = payload;
-
+        const verifierPublicKeyHash = ethers.utils.keccak256(
+          Buffer.from(verifierPublicKeyArmored, "utf8")
+        );
         // Verify the payload is signed correctly by the verifier
         const verifierPublicKey = await getPGPKey(verifierPublicKeyArmored);
         const verifyOptions = {
@@ -198,10 +201,15 @@ export class UsersRoutes extends CommonRoutesConfig {
         const proofDoc = JSON.parse(decryptedText);
 
         // Set the nonce
-        const verificationNonce = toBase64(
-          getVerificationNonce(state, latestVerification._hex, credentialId)
+        const verificationNonce = getVerificationNonce(
+          state,
+          latestVerification._hex,
+          credentialId,
+          verifierPublicKeyHash
         );
-        proofDoc.proof.nonce = verificationNonce;
+
+        proofDoc.proof.nonce =
+          Buffer.from(verificationNonce).toString("base64");
 
         // Verify the provided nonce correctly validates the proof doc
         const verified = await verify(proofDoc, {
@@ -221,7 +229,8 @@ export class UsersRoutes extends CommonRoutesConfig {
         const computedVerificationId = generateVerificationId(
           proofDoc,
           latestVerification._hex,
-          credentialId
+          credentialId,
+          verifierPublicKeyHash
         );
 
         // Final sanity check to make sure everyone agrees on what is to be put on chain
@@ -245,13 +254,13 @@ export class UsersRoutes extends CommonRoutesConfig {
         const encrypteDocstringWithSecrets = (await pgpEncrypt(options)).data;
 
         const timestamp = dayjs().unix();
-        await this.identityContract.mintVerification(
-          credentialId,
-          computedVerificationId,
-          encrypteDocstringWithSecrets,
-          timestamp,
-          verifierPublicKeyArmored
-        );
+        // await this.identityContract.mintVerification(
+        //   credentialId,
+        //   computedVerificationId,
+        //   encrypteDocstringWithSecrets,
+        //   timestamp,
+        //   verifierPublicKeyArmored
+        // );
 
         res
           .status(200)
