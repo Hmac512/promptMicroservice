@@ -6,6 +6,6 @@
       "strict": true,
       "esModuleInterop": true,
       "inlineSourceMap": true,
-      
+      "resolveJsonModule": true,
     },
   }
