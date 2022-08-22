@@ -88,7 +88,6 @@ export class UsersRoutes extends CommonRoutesConfig {
         const { firstName, lastName, holderPublicKeyArmored } = payload;
         console.log(holderPublicKeyArmored);
         const id = generateUniqSerial();
-        //await getPGPKey(PGPPublicKeyString);
         const holderPublicKey = await getPGPKey(holderPublicKeyArmored);
         const verifyOptions = {
           message: clearText,
@@ -203,6 +202,7 @@ export class UsersRoutes extends CommonRoutesConfig {
             .send(makeErrorResp("Bad Credential Holder Signature"));
         }
         const proofDoc = JSON.parse(decryptedText);
+        // ! We should also do a check to make sure the provided doc is for the credential stored on chain.
 
         // Set the nonce
         const verificationNonce = getVerificationNonce(

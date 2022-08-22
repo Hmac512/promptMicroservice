@@ -14,16 +14,16 @@ import {
 } from "openpgp";
 import { getPGPKey } from "../Identity/utils";
 
-export const contractAddress = "0x4BD023b2E66d37958A3948A7130e2Ed55FDD7c5b";
-//export const contractAddress = "0xc11B96C03E50172a200A6dd1229BB780cBbf1a4e";
+//export const contractAddress = "0x4BD023b2E66d37958A3948A7130e2Ed55FDD7c5b";
+export const contractAddress = "0xc11B96C03E50172a200A6dd1229BB780cBbf1a4e";
 
 export abstract class CommonRoutesConfig {
   app: express.Application;
   name: string;
-  ethProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
-  // ethProvider = new ethers.providers.JsonRpcProvider(
-  //   "https://eth-rinkeby.alchemyapi.io/v2/rZyczYFE3MMFrANNaZ2TqeN20XPsmw_w"
-  // );
+  //ethProvider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
+  ethProvider = new ethers.providers.JsonRpcProvider(
+    "https://eth-rinkeby.alchemyapi.io/v2/rZyczYFE3MMFrANNaZ2TqeN20XPsmw_w"
+  );
   ethSigner = new ethers.Wallet(`0x${ethPrivKey}`, this.ethProvider);
   static pgpPrivateKey: pgpKey_.Key;
   static pgpPublicKey: pgpKey_.Key;
